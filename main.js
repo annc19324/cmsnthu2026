@@ -334,10 +334,15 @@ function fallbackMic() {
 }
 
 function checkBlow() {
-    if (!candlesLit || !micAnalyser) return;
+    if (!candlesLit || !micAnalyser) {
+        if (micCheckBlowLoopId) cancelAnimationFrame(micCheckBlowLoopId);
+        micCheckBlowLoopId = null;
+        return;
+    }
 
-    // Grace period: don't check for 1000ms after lighting (prevents click-noise trigger)
-    if (Date.now() - lastLitTime < 1000) {
+    // Grace period: don't check for 1500ms after lighting (more safety for mobile)
+    // This ignores the sound of the click itself
+    if (Date.now() - lastLitTime < 1500) {
         micCheckBlowLoopId = requestAnimationFrame(checkBlow);
         return;
     }
@@ -351,19 +356,24 @@ function checkBlow() {
         if (dataArray[i] > maxVol) maxVol = dataArray[i];
     }
 
-    // Increased threshold for laptop safety
-    if (maxVol > 180) {
+    // Increased threshold slightly for mobile/noisy environments
+    if (maxVol > 200) {
         blowOutCandles();
     } else {
         micCheckBlowLoopId = requestAnimationFrame(checkBlow);
     }
 }
 
-// Fixed: Unified click handler for the cake
 cakeContainer.onclick = async () => {
     if (!candlesLit) {
         // LIGHT CANDLES
         candlesLit = true;
+        lastLitTime = Date.now(); // Set immediately to ignore current click noise
+
+        // Cancel any ghost loops
+        if (micCheckBlowLoopId) cancelAnimationFrame(micCheckBlowLoopId);
+        micCheckBlowLoopId = null;
+
         document.querySelectorAll('.flame').forEach(flame => flame.classList.remove('off'));
         cakeInstruction.innerText = "Đang thắp nến... 🕯️";
 
@@ -381,7 +391,6 @@ cakeContainer.onclick = async () => {
                 setTimeout(() => {
                     cakeInstruction.innerText = "Giờ m hãy thổi vào mic để tắt nến nhé! 🌬️🎂";
                     cakeInstruction.style.animation = 'pulse 1.5s infinite';
-                    lastLitTime = Date.now();
                     if (!micCheckBlowLoopId) micCheckBlowLoopId = requestAnimationFrame(checkBlow);
                 }, 200);
 
@@ -393,7 +402,7 @@ cakeContainer.onclick = async () => {
             fallbackMicMode();
         }
     } else {
-        // Manual blowout if mic mode failed or user clicks while lit
+        // Manual blowout if mic failed or user clicks while lit
         if (micError || !audioStream) {
             blowOutCandles();
         }
