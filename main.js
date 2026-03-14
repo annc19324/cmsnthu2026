@@ -317,10 +317,41 @@ async function winGame() {
 const cakeInstruction = document.getElementById('cake-instruction');
 let candlesLit = false;
 
+// Mic variables - shared across cycles
+let micAudioCtx = null;
+let micAnalyser = null;
+let micMicrophone = null;
+let micCheckBlowLoopId = null;
+
 function fallbackMic() {
     cakeInstruction.innerText = "Không mở mic được rùi, m bấm vào bánh để tắt nến nha! 🎂";
     // Allow clicking to blowout if Mic fails
     cakeContainer.addEventListener('click', blowOutCandles, { once: true });
+}
+
+function checkBlow() {
+    if (!candlesLit || !micAnalyser) {
+        cancelAnimationFrame(micCheckBlowLoopId);
+        micCheckBlowLoopId = null;
+        return;
+    }
+
+    const bufferLength = micAnalyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    micAnalyser.getByteFrequencyData(dataArray);
+
+    let maxVol = 0;
+    for (let i = 0; i < bufferLength; i++) {
+        if (dataArray[i] > maxVol) {
+            maxVol = dataArray[i];
+        }
+    }
+
+    if (maxVol > 120) { // Lower threshold since phone mics compress/noise-cancel blowing sounds
+        blowOutCandles();
+    } else {
+        micCheckBlowLoopId = requestAnimationFrame(checkBlow);
+    }
 }
 
 cakeContainer.addEventListener('click', async () => {
@@ -333,36 +364,23 @@ cakeContainer.addEventListener('click', async () => {
             cakeInstruction.style.animation = 'pulse 1.5s infinite';
 
             try {
-                const audioCtxMic = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioCtxMic.state === 'suspended') audioCtxMic.resume();
-                const analyser = audioCtxMic.createAnalyser();
-                const microphone = audioCtxMic.createMediaStreamSource(audioStream);
-                microphone.connect(analyser);
-                analyser.fftSize = 256;
-                const bufferLength = analyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
+                if (!micAudioCtx) { // Initialize AudioContext and analyser only once
+                    micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    micAnalyser = micAudioCtx.createAnalyser();
+                    micAnalyser.fftSize = 256;
+                    micMicrophone = micAudioCtx.createMediaStreamSource(audioStream);
+                    micMicrophone.connect(micAnalyser);
+                }
 
-                const checkBlow = () => {
-                    if (!candlesLit) return;
-                    analyser.getByteFrequencyData(dataArray);
+                if (micAudioCtx.state === 'suspended') {
+                    await micAudioCtx.resume();
+                }
 
-                    // Instead of average, find the peak frequency amplitude
-                    // Microphones on phones often suppress continuous noise like blowing
-                    let maxVol = 0;
-                    for (let i = 0; i < bufferLength; i++) {
-                        if (dataArray[i] > maxVol) {
-                            maxVol = dataArray[i];
-                        }
-                    }
+                // Start the blow check loop
+                if (!micCheckBlowLoopId) {
+                    micCheckBlowLoopId = requestAnimationFrame(checkBlow);
+                }
 
-                    // Lower threshold since phone mics compress/noise-cancel blowing sounds
-                    if (maxVol > 120) {
-                        blowOutCandles();
-                    } else {
-                        requestAnimationFrame(checkBlow);
-                    }
-                };
-                checkBlow();
             } catch (e) {
                 console.error("Mic Context error:", e);
                 fallbackMic();
@@ -376,19 +394,25 @@ cakeContainer.addEventListener('click', async () => {
 function blowOutCandles() {
     if (!candlesLit) return;
     candlesLit = false;
-    document.querySelectorAll('.flame').forEach(flame => flame.classList.add('off'));
-    cakeInstruction.innerText = "Yayy! 🎉 Mãi đỉnh lun";
-    cakeInstruction.style.animation = 'none';
 
-    // Stop mic stream
-    if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
+    // Stop the mic check loop (don't stop audioStream so it can be reused)
+    if (micCheckBlowLoopId) {
+        cancelAnimationFrame(micCheckBlowLoopId);
+        micCheckBlowLoopId = null;
     }
 
-    // Play cheer sound
-    try { cheerAudio.play().catch(() => { }); } catch (e) { }
+    document.querySelectorAll('.flame').forEach(flame => flame.classList.add('off'));
 
-    // More confetti
+    // Play cheer sound - reset first so multiple plays work
+    try {
+        cheerAudio.pause();
+        cheerAudio.currentTime = 0;
+        cheerAudio.play().catch(() => { });
+    } catch (e) { }
+
+    cakeInstruction.innerText = "Yayy! 🎉 Mãi đỉnh lun - nhấn lại để thắp nến nữa nhé!";
+    cakeInstruction.style.animation = 'none';
+
     window.confetti({ particleCount: 200, spread: 120, origin: { y: 0.7 } });
     playWinSound();
 }
