@@ -106,10 +106,23 @@ async function typeWriter(element, lines) {
     }
 }
 
+// Global mic variables
+let audioStream = null;
+let micError = false;
+
 // Init Start sequence
-document.getElementById('open-gift-btn').addEventListener('click', () => {
+document.getElementById('open-gift-btn').addEventListener('click', async () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     playClickSound(); // Add sound effect to open button
+
+    // Request Mic Access early
+    try {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (e) {
+        console.error("Mic error:", e);
+        micError = true;
+    }
+
     preStartScreen.classList.add('hidden');
     preStartScreen.classList.remove('active');
     startScreen.classList.remove('hidden');
@@ -297,46 +310,52 @@ async function winGame() {
 // Cake interaction
 const cakeInstruction = document.getElementById('cake-instruction');
 let candlesLit = false;
-let audioStream = null;
+
+function fallbackMic() {
+    cakeInstruction.innerText = "Không mở mic được rùi, m bấm vào bánh để tắt nến nha! 🎂";
+    // Allow clicking to blowout if Mic fails
+    cakeContainer.addEventListener('click', blowOutCandles, { once: true });
+}
 
 cakeContainer.addEventListener('click', async () => {
     if (!candlesLit) {
         candlesLit = true;
         document.querySelectorAll('.flame').forEach(flame => flame.classList.remove('off'));
-        cakeInstruction.innerText = "Wow! Giờ m hãy thổi vào mic để tắt nến nhé! 🌬️🎂";
-        cakeInstruction.style.animation = 'pulse 1.5s infinite';
 
-        // Request Mic Access
-        try {
-            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            const audioCtxMic = new (window.AudioContext || window.webkitAudioContext)();
-            const analyser = audioCtxMic.createAnalyser();
-            const microphone = audioCtxMic.createMediaStreamSource(audioStream);
-            microphone.connect(analyser);
-            analyser.fftSize = 256;
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
+        if (audioStream && !micError) {
+            cakeInstruction.innerText = "Wow! Giờ m hãy thổi vào mic để tắt nến nhé! 🌬️🎂";
+            cakeInstruction.style.animation = 'pulse 1.5s infinite';
 
-            const checkBlow = () => {
-                if (!candlesLit) return;
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
-                let average = sum / bufferLength;
+            try {
+                const audioCtxMic = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtxMic.state === 'suspended') audioCtxMic.resume();
+                const analyser = audioCtxMic.createAnalyser();
+                const microphone = audioCtxMic.createMediaStreamSource(audioStream);
+                microphone.connect(analyser);
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
 
-                if (average > 75) {
-                    blowOutCandles();
-                } else {
-                    requestAnimationFrame(checkBlow);
-                }
-            };
-            checkBlow();
+                const checkBlow = () => {
+                    if (!candlesLit) return;
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+                    let average = sum / bufferLength;
 
-        } catch (e) {
-            console.error("Mic error:", e);
-            cakeInstruction.innerText = "Không mở mic được rùi, m bấm vào bánh để tắt nến nha! 🎂";
-            // Allow clicking to blowout if Mic fails
-            cakeContainer.addEventListener('click', blowOutCandles, { once: true });
+                    if (average > 75) {
+                        blowOutCandles();
+                    } else {
+                        requestAnimationFrame(checkBlow);
+                    }
+                };
+                checkBlow();
+            } catch (e) {
+                console.error("Mic Context error:", e);
+                fallbackMic();
+            }
+        } else {
+            fallbackMic();
         }
     }
 });
