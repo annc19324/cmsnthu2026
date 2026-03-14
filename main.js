@@ -115,6 +115,12 @@ document.getElementById('open-gift-btn').addEventListener('click', async () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     playClickSound(); // Add sound effect to open button
 
+    // Unlock audio element on first user interaction so it can play later without direct click
+    cheerAudio.play().then(() => {
+        cheerAudio.pause();
+        cheerAudio.currentTime = 0;
+    }).catch(e => console.log("Audio unlock failed until later: ", e));
+
     // Request Mic Access early
     try {
         audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
