@@ -35,6 +35,11 @@ const startMessages = [
 ];
 
 const cheerAudio = new Audio('./yay-group-of-kids-cheering.mp3');
+// Note: In development, Vite serves root. In production, assets should be in public/. 
+// I moved them to public/ but kept origin for local dev compatibility if needed.
+// Actually, let's use the absolute-looking path which Vite maps to public.
+cheerAudio.src = '/yay-group-of-kids-cheering.mp3';
+
 
 function playCuteTypeSound() {
     if (audioCtx.state === 'suspended') return;
@@ -322,6 +327,8 @@ let micAudioCtx = null;
 let micAnalyser = null;
 let micMicrophone = null;
 let micCheckBlowLoopId = null;
+let lastLitTime = 0; // Prevent immediate blowout from click sound
+
 
 function fallbackMic() {
     cakeInstruction.innerText = "Không mở mic được rùi, m bấm vào bánh để tắt nến nha! 🎂";
@@ -331,8 +338,14 @@ function fallbackMic() {
 
 function checkBlow() {
     if (!candlesLit || !micAnalyser) {
-        cancelAnimationFrame(micCheckBlowLoopId);
+        if (micCheckBlowLoopId) cancelAnimationFrame(micCheckBlowLoopId);
         micCheckBlowLoopId = null;
+        return;
+    }
+
+    // Grace period: don't check for 500ms after lighting
+    if (Date.now() - lastLitTime < 500) {
+        micCheckBlowLoopId = requestAnimationFrame(checkBlow);
         return;
     }
 
@@ -342,12 +355,11 @@ function checkBlow() {
 
     let maxVol = 0;
     for (let i = 0; i < bufferLength; i++) {
-        if (dataArray[i] > maxVol) {
-            maxVol = dataArray[i];
-        }
+        if (dataArray[i] > maxVol) maxVol = dataArray[i];
     }
 
-    if (maxVol > 120) { // Lower threshold since phone mics compress/noise-cancel blowing sounds
+    // Threshold 150 is safer for laptop fans but good for blowing
+    if (maxVol > 150) {
         blowOutCandles();
     } else {
         micCheckBlowLoopId = requestAnimationFrame(checkBlow);
@@ -364,7 +376,7 @@ cakeContainer.addEventListener('click', async () => {
             cakeInstruction.style.animation = 'pulse 1.5s infinite';
 
             try {
-                if (!micAudioCtx) { // Initialize AudioContext and analyser only once
+                if (!micAudioCtx) {
                     micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                     micAnalyser = micAudioCtx.createAnalyser();
                     micAnalyser.fftSize = 256;
@@ -376,7 +388,8 @@ cakeContainer.addEventListener('click', async () => {
                     await micAudioCtx.resume();
                 }
 
-                // Start the blow check loop
+                lastLitTime = Date.now(); // Mark when we lit it
+
                 if (!micCheckBlowLoopId) {
                     micCheckBlowLoopId = requestAnimationFrame(checkBlow);
                 }
