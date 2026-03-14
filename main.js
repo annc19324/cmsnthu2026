@@ -325,6 +325,10 @@ let micAnalyser = null;
 let micMicrophone = null;
 let micCheckBlowLoopId = null;
 let lastLitTime = 0; // Prevent immediate blowout from click sound
+let blowFrameCount = 0; // Sustained blow detection counter
+const BLOW_FRAMES_NEEDED = 10; // Must detect blow for ~10 consecutive frames
+const BLOW_THRESHOLD = 120;    // Volume threshold (0-255)
+let cheerEndTime = 0;          // Track when cheer audio finishes to block mic
 
 
 function fallbackMic() {
@@ -337,12 +341,22 @@ function checkBlow() {
     if (!candlesLit || !micAnalyser) {
         if (micCheckBlowLoopId) cancelAnimationFrame(micCheckBlowLoopId);
         micCheckBlowLoopId = null;
+        blowFrameCount = 0;
         return;
     }
 
-    // Grace period: don't check for 1500ms after lighting (more safety for mobile)
-    // This ignores the sound of the click itself
-    if (Date.now() - lastLitTime < 1500) {
+    const now = Date.now();
+
+    // Grace period: ignore mic for 2s after lighting (blocks click sound & cheer audio)
+    if (now - lastLitTime < 2000) {
+        blowFrameCount = 0;
+        micCheckBlowLoopId = requestAnimationFrame(checkBlow);
+        return;
+    }
+
+    // Block mic while cheer audio is playing + 2s cooldown after it ends
+    if (!cheerAudio.paused || now < cheerEndTime) {
+        blowFrameCount = 0;
         micCheckBlowLoopId = requestAnimationFrame(checkBlow);
         return;
     }
@@ -351,17 +365,30 @@ function checkBlow() {
     const dataArray = new Uint8Array(bufferLength);
     micAnalyser.getByteFrequencyData(dataArray);
 
+    // Use average volume across all bins (more robust than max alone)
+    let sum = 0;
     let maxVol = 0;
     for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
         if (dataArray[i] > maxVol) maxVol = dataArray[i];
     }
+    const avgVol = sum / bufferLength;
 
-    // Increased threshold slightly for mobile/noisy environments
-    if (maxVol > 200) {
-        blowOutCandles();
+    // Sustained blow: must exceed threshold for BLOW_FRAMES_NEEDED consecutive frames
+    // Both max AND average must be high to distinguish real blowing from a short noise
+    if (maxVol > BLOW_THRESHOLD && avgVol > 15) {
+        blowFrameCount++;
+        if (blowFrameCount >= BLOW_FRAMES_NEEDED) {
+            blowFrameCount = 0;
+            blowOutCandles();
+            return;
+        }
     } else {
-        micCheckBlowLoopId = requestAnimationFrame(checkBlow);
+        // Reset counter if sound drops — must be sustained
+        blowFrameCount = 0;
     }
+
+    micCheckBlowLoopId = requestAnimationFrame(checkBlow);
 }
 
 cakeContainer.onclick = async () => {
@@ -418,6 +445,7 @@ function fallbackMicMode() {
 function blowOutCandles() {
     if (!candlesLit) return;
     candlesLit = false;
+    blowFrameCount = 0;
 
     // Stop the mic check loop (don't stop audioStream so it can be reused)
     if (micCheckBlowLoopId) {
@@ -428,9 +456,14 @@ function blowOutCandles() {
     document.querySelectorAll('.flame').forEach(flame => flame.classList.add('off'));
 
     // Play cheer sound - reset first so multiple plays work
+    // Track when it ends so mic is blocked during + after playback
     try {
         cheerAudio.pause();
         cheerAudio.currentTime = 0;
+        cheerAudio.onended = () => {
+            // Block mic for 2 extra seconds after the sound finishes
+            cheerEndTime = Date.now() + 2000;
+        };
         cheerAudio.play().catch(() => { });
     } catch (e) { }
 
