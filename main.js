@@ -339,11 +339,18 @@ cakeContainer.addEventListener('click', async () => {
                 const checkBlow = () => {
                     if (!candlesLit) return;
                     analyser.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
-                    let average = sum / bufferLength;
 
-                    if (average > 75) {
+                    // Instead of average, find the peak frequency amplitude
+                    // Microphones on phones often suppress continuous noise like blowing
+                    let maxVol = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        if (dataArray[i] > maxVol) {
+                            maxVol = dataArray[i];
+                        }
+                    }
+
+                    // Lower threshold since phone mics compress/noise-cancel blowing sounds
+                    if (maxVol > 120) {
                         blowOutCandles();
                     } else {
                         requestAnimationFrame(checkBlow);
