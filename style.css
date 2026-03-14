@@ -43,11 +43,13 @@ body {
     color: rgba(255, 182, 193, 0.6);
     animation: floatUp linear infinite;
     user-select: none;
+    will-change: transform, opacity;
+    /* Force GPU calculation for buttery smooth frame rate */
 }
 
 @keyframes floatUp {
     0% {
-        transform: translateY(0) rotate(0) scale(0.8);
+        transform: translate3d(0, 0, 0) rotate(0) scale(0.8);
         opacity: 0;
     }
 
@@ -60,7 +62,7 @@ body {
     }
 
     100% {
-        transform: translateY(-110vh) rotate(360deg) scale(1.2);
+        transform: translate3d(0, -110vh, 0) rotate(360deg) scale(1.2);
         opacity: 0;
     }
 }
@@ -235,10 +237,8 @@ body {
     transition: transform 0.2s;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
-    background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="%23FFEB3B" stroke="%23FBC02D" stroke-width="1"/></svg>');
-    background-size: 100% 100%;
-    background-position: center;
-    filter: drop-shadow(0 0 8px rgba(240, 98, 146, 0.8));
+    will-change: transform;
+    /* Hardware Acceleration for stars */
 }
 
 .star::before {
@@ -275,11 +275,11 @@ body {
 
 @keyframes fall {
     0% {
-        transform: translateY(-100px) rotate(0);
+        transform: translate3d(0, -100px, 0) rotate(0);
     }
 
     100% {
-        transform: translateY(110vh) rotate(360deg);
+        transform: translate3d(0, 110vh, 0) rotate(360deg);
     }
 }
 

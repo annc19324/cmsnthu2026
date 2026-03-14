@@ -13,7 +13,8 @@ function createHeart() {
         heart.remove();
     }, 13000);
 }
-setInterval(createHeart, 800);
+const isMobile = window.innerWidth <= 600;
+setInterval(createHeart, isMobile ? 1500 : 800);
 
 // Screens
 const preStartScreen = document.getElementById('pre-start-screen');
@@ -171,7 +172,7 @@ function createStar() {
 
 function startGame() {
     gameActive = true;
-    starInterval = setInterval(createStar, 700);
+    starInterval = setInterval(createStar, isMobile ? 1000 : 700);
 }
 
 function checkLetter(letter) {
