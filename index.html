@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Happy Birthday Thư 🎂</title>
+  <!-- Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@500;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <meta name="description" content="A cute birthday mini-game for Thư">
+</head>
+
+<body>
+  <!-- Hearts Container (Background Animation) -->
+  <div id="hearts-container"></div>
+
+  <!-- Pre-Start Screen (Requires Interaction for Audio) -->
+  <div id="pre-start-screen" class="screen active">
+    <button id="open-gift-btn" class="cute-btn"
+      style="font-size: 1.5rem; padding: 15px 40px; border-radius: 30px; animation: pulse 1.5s infinite;">Mở thư
+      💌</button>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="screen hidden">
+    <div id="typewriter-start" class="typewriter-text"></div>
+    <button id="start-btn" class="hidden cute-btn">Start Game ✨</button>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen" class="screen hidden">
+    <div id="letters-display" class="glass-card">
+      <div class="box" id="box-T">
+        <span class="placeholder">_</span>
+        <span class="letter hidden">T</span>
+      </div>
+      <div class="box" id="box-H">
+        <span class="placeholder">_</span>
+        <span class="letter hidden">H</span>
+      </div>
+      <div class="box" id="box-U">
+        <span class="placeholder">_</span>
+        <span class="letter hidden">Ư</span>
+      </div>
+    </div>
+    <div id="game-area"></div>
+  </div>
+
+  <!-- Winning Screen -->
+  <div id="win-screen" class="screen hidden">
+    <canvas id="fireworks-canvas"></canvas>
+    <div class="win-content glass-card overlay-card">
+      <h1 id="win-word" class="hidden">THƯ</h1>
+      <div id="typewriter-win" class="typewriter-text"></div>
+
+      <div id="cake-container" class="hidden">
+        <div class="cake" id="birthday-cake">
+          <div class="cake-candles">
+            <div class="candle">
+              <div class="flame off"></div>
+            </div>
+            <div class="candle">
+              <div class="flame off"></div>
+            </div>
+            <div class="candle">
+              <div class="flame off"></div>
+            </div>
+          </div>
+          <div class="cake-tier top"></div>
+          <div class="cake-tier middle"></div>
+          <div class="cake-tier bottom"></div>
+        </div>
+        <p id="cake-instruction" class="pulse-text">Nhấn vào bánh kem để thắp nến nhé! ✨</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script type="module" src="./main.js"></script>
+</body>
+
+</html>
