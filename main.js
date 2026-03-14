@@ -34,11 +34,7 @@ const startMessages = [
     "T muốn m giúp t bắt những ngôi sao để tạo thành tên của m. ✨"
 ];
 
-const cheerAudio = new Audio('./yay-group-of-kids-cheering.mp3');
-// Note: In development, Vite serves root. In production, assets should be in public/. 
-// I moved them to public/ but kept origin for local dev compatibility if needed.
-// Actually, let's use the absolute-looking path which Vite maps to public.
-cheerAudio.src = '/yay-group-of-kids-cheering.mp3';
+const cheerAudio = new Audio('/yay-group-of-kids-cheering.mp3');
 
 
 function playCuteTypeSound() {
@@ -120,11 +116,12 @@ document.getElementById('open-gift-btn').addEventListener('click', async () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     playClickSound(); // Add sound effect to open button
 
-    // Unlock audio element on first user interaction so it can play later without direct click
+    // Unlock audio element on first user interaction
+    cheerAudio.load();
     cheerAudio.play().then(() => {
         cheerAudio.pause();
         cheerAudio.currentTime = 0;
-    }).catch(e => console.log("Audio unlock failed until later: ", e));
+    }).catch(e => console.log("Audio unlock failed: ", e));
 
     // Request Mic Access early
     try {
@@ -337,14 +334,10 @@ function fallbackMic() {
 }
 
 function checkBlow() {
-    if (!candlesLit || !micAnalyser) {
-        if (micCheckBlowLoopId) cancelAnimationFrame(micCheckBlowLoopId);
-        micCheckBlowLoopId = null;
-        return;
-    }
+    if (!candlesLit || !micAnalyser) return;
 
-    // Grace period: don't check for 500ms after lighting
-    if (Date.now() - lastLitTime < 500) {
+    // Grace period: don't check for 1000ms after lighting (prevents click-noise trigger)
+    if (Date.now() - lastLitTime < 1000) {
         micCheckBlowLoopId = requestAnimationFrame(checkBlow);
         return;
     }
@@ -358,23 +351,23 @@ function checkBlow() {
         if (dataArray[i] > maxVol) maxVol = dataArray[i];
     }
 
-    // Threshold 150 is safer for laptop fans but good for blowing
-    if (maxVol > 150) {
+    // Increased threshold for laptop safety
+    if (maxVol > 180) {
         blowOutCandles();
     } else {
         micCheckBlowLoopId = requestAnimationFrame(checkBlow);
     }
 }
 
-cakeContainer.addEventListener('click', async () => {
+// Fixed: Unified click handler for the cake
+cakeContainer.onclick = async () => {
     if (!candlesLit) {
+        // LIGHT CANDLES
         candlesLit = true;
         document.querySelectorAll('.flame').forEach(flame => flame.classList.remove('off'));
+        cakeInstruction.innerText = "Đang thắp nến... 🕯️";
 
         if (audioStream && !micError) {
-            cakeInstruction.innerText = "Wow! Giờ m hãy thổi vào mic để tắt nến nhé! 🌬️🎂";
-            cakeInstruction.style.animation = 'pulse 1.5s infinite';
-
             try {
                 if (!micAudioCtx) {
                     micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -383,26 +376,35 @@ cakeContainer.addEventListener('click', async () => {
                     micMicrophone = micAudioCtx.createMediaStreamSource(audioStream);
                     micMicrophone.connect(micAnalyser);
                 }
+                if (micAudioCtx.state === 'suspended') await micAudioCtx.resume();
 
-                if (micAudioCtx.state === 'suspended') {
-                    await micAudioCtx.resume();
-                }
-
-                lastLitTime = Date.now(); // Mark when we lit it
-
-                if (!micCheckBlowLoopId) {
-                    micCheckBlowLoopId = requestAnimationFrame(checkBlow);
-                }
+                setTimeout(() => {
+                    cakeInstruction.innerText = "Giờ m hãy thổi vào mic để tắt nến nhé! 🌬️🎂";
+                    cakeInstruction.style.animation = 'pulse 1.5s infinite';
+                    lastLitTime = Date.now();
+                    if (!micCheckBlowLoopId) micCheckBlowLoopId = requestAnimationFrame(checkBlow);
+                }, 200);
 
             } catch (e) {
-                console.error("Mic Context error:", e);
-                fallbackMic();
+                console.error("Mic error:", e);
+                fallbackMicMode();
             }
         } else {
-            fallbackMic();
+            fallbackMicMode();
+        }
+    } else {
+        // Manual blowout if mic mode failed or user clicks while lit
+        if (micError || !audioStream) {
+            blowOutCandles();
         }
     }
-});
+};
+
+function fallbackMicMode() {
+    cakeInstruction.innerText = "Không mở mic được rùi, m bấm vào bánh để tắt nến nha! 🎂";
+    micError = true;
+}
+
 
 function blowOutCandles() {
     if (!candlesLit) return;
